@@ -15,7 +15,7 @@
 # chart -- acceptable for a dev cluster, change both for anything else.
 #
 # ============================================================================
-# EDIT the `ui` section below: the console's Management API URL (CHANGE_ME_NODE_IP).
+# EDIT the `ui` section below: the console's Management API URL (192.168.1.252).
 # ============================================================================
 management:
   type: mongodb
@@ -96,7 +96,7 @@ ui:
   # ==========================================================================
   # EDIT THIS ONE BLOCK: the console is a static UI rendered in your BROWSER,
   # so it must be pointed at a node-reachable address of the Management API.
-  # Replace CHANGE_ME_NODE_IP with any worker/control-plane node IP
+  # Replace 192.168.1.252 with any worker/control-plane node IP
   # (kubectl get nodes -o wide). Without this the login page cannot reach the API.
   # Do NOT override MGMT_API_URL via ui.env as well: the chart renders the same
   # env var itself and Kubernetes server-side apply (Fleet) rejects duplicates.
@@ -104,7 +104,7 @@ ui:
   # ==========================================================================
   # Written into the console's constants.json (verified: the image serves this
   # file verbatim; it only env-substitutes $VAR placeholders inside the file)
-  baseURL: http://CHANGE_ME_NODE_IP:30083/management
+  baseURL: http://192.168.1.252:30083/management
   env: []
 
 # --- MongoDB subchart (bitnami/mongodb 16.5.45) -----------------------------
