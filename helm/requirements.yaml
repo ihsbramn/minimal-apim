@@ -1,0 +1,9 @@
+dependencies:
+  - name: elasticsearch
+    version: 22.0.13
+    repository: https://charts.bitnami.com/bitnami
+    condition: elasticsearch.enabled
+  - name: mongodb
+    version: 16.5.45
+    repository: https://charts.bitnami.com/bitnami
+    condition: mongodb.enabled

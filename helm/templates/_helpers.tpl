@@ -1,0 +1,562 @@
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Expand the name of the chart.
+*/}}
+{{- define "gravitee.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Create a default fully qualified app name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "gravitee.fullname" -}}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Create a default fully qualified gateway name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "gravitee.gateway.fullname" -}}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- if .Values.fullnameOverride -}}
+{{- printf "%s-%s" .Values.fullnameOverride .Values.gateway.name | trunc 63 | trimSuffix "-" -}}
+{{- else if contains $name .Release.Name -}}
+{{- printf "%s-%s" .Release.Name .Values.gateway.name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s-%s" .Release.Name $name .Values.gateway.name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Create a default fully qualified api name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "gravitee.api.fullname" -}}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- if .Values.fullnameOverride -}}
+{{- printf "%s-%s" .Values.fullnameOverride .Values.api.name | trunc 63 | trimSuffix "-" -}}
+{{- else if contains $name .Release.Name -}}
+{{- printf "%s-%s" .Release.Name .Values.api.name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s-%s" .Release.Name $name .Values.api.name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Create a default fully qualified ui name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "gravitee.ui.fullname" -}}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- if .Values.fullnameOverride -}}
+{{- printf "%s-%s" .Values.fullnameOverride .Values.ui.name | trunc 63 | trimSuffix "-" -}}
+{{- else if contains $name .Release.Name -}}
+{{- printf "%s-%s" .Release.Name .Values.ui.name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s-%s" .Release.Name $name .Values.ui.name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Create a default fully qualified gammaUi name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "gravitee.gammaUi.fullname" -}}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- if .Values.fullnameOverride -}}
+{{- printf "%s-%s" .Values.fullnameOverride .Values.gammaUi.name | trunc 63 | trimSuffix "-" -}}
+{{- else if contains $name .Release.Name -}}
+{{- printf "%s-%s" .Release.Name .Values.gammaUi.name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s-%s" .Release.Name $name .Values.gammaUi.name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Create a default fully qualified portal name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "gravitee.portal.fullname" -}}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- if .Values.fullnameOverride -}}
+{{- printf "%s-%s" .Values.fullnameOverride .Values.portal.name | trunc 63 | trimSuffix "-" -}}
+{{- else if contains $name .Release.Name -}}
+{{- printf "%s-%s" .Release.Name .Values.portal.name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s-%s" .Release.Name $name .Values.portal.name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Create a default fully qualified kafka console name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "gravitee.kafkaConsole.fullname" -}}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- if .Values.fullnameOverride -}}
+{{- printf "%s-%s" .Values.fullnameOverride .Values.kafkaConsole.name | trunc 63 | trimSuffix "-" -}}
+{{- else if contains $name .Release.Name -}}
+{{- printf "%s-%s" .Release.Name .Values.kafkaConsole.name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s-%s" .Release.Name $name .Values.kafkaConsole.name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return true when security contexts should be adapted for OpenShift compatibility.
+*/}}
+{{- define "gravitee.shouldAdaptSecurityContext" -}}
+{{- $mode := .context.Values.openshift.adaptSecurityContext | default "auto" -}}
+{{- if eq $mode "force" -}}
+true
+{{- else if eq $mode "disabled" -}}
+false
+{{- else if .context.Values.openshift.enabled -}}
+true
+{{- else -}}
+false
+{{- end -}}
+{{- end -}}
+
+{{/*
+Adapt a pod securityContext for OpenShift compatibility.
+*/}}
+{{- define "gravitee.adaptPodSecurityContext" -}}
+{{- $securityContext := deepCopy (.securityContext | default dict) -}}
+{{- if eq (include "gravitee.shouldAdaptSecurityContext" .) "true" -}}
+{{- $_ := unset $securityContext "runAsUser" -}}
+{{- $_ := unset $securityContext "runAsGroup" -}}
+{{- $_ := unset $securityContext "fsGroup" -}}
+{{- end -}}
+{{- toYaml $securityContext -}}
+{{- end -}}
+
+{{/*
+Adapt a container securityContext for OpenShift compatibility.
+*/}}
+{{- define "gravitee.adaptContainerSecurityContext" -}}
+{{- $securityContext := deepCopy (.securityContext | default dict) -}}
+{{- if eq (include "gravitee.shouldAdaptSecurityContext" .) "true" -}}
+{{- $_ := unset $securityContext "runAsUser" -}}
+{{- $_ := unset $securityContext "runAsGroup" -}}
+{{- end -}}
+{{- toYaml $securityContext -}}
+{{- end -}}
+
+{{/*
+Render an initContainer base spec with OpenShift-adapted securityContext.
+*/}}
+{{- define "gravitee.renderInitContainerSpec" -}}
+{{- $initContainer := deepCopy (.initContainer | default dict) -}}
+{{- if hasKey $initContainer "securityContext" -}}
+{{- $_ := set $initContainer "securityContext" (fromYaml (include "gravitee.adaptContainerSecurityContext" (dict "context" .context "securityContext" $initContainer.securityContext))) -}}
+{{- end -}}
+{{- toYaml $initContainer -}}
+{{- end -}}
+
+{{/*
+Create initContainers for downloading plugins ext plugin-ext
+*/}}
+{{- define "deployment.pluginInitContainers" -}}
+{{- if .plugins }}
+- name: get-plugins
+  {{- include "gravitee.renderInitContainerSpec" (dict "context" .context "initContainer" .initContainers) | nindent 2 }}
+  command: ['sh', '-c', "mkdir -p /tmp/plugins && cd /tmp/plugins {{- range $url := .plugins -}}
+    {{ printf " && ( rm "}} {{regexFind "[^/]+$" $url}} {{ printf " 2>/dev/null || true ) && wget %s" $url }}
+  {{- end -}}"]
+  volumeMounts:
+    - name: graviteeio-apim-plugins
+      mountPath: /tmp/plugins
+{{- end }}
+{{- range $key, $url := .extPlugins }}
+- name: get-{{ $key }}-ext
+  {{- include "gravitee.renderInitContainerSpec" (dict "context" .context "initContainer" .initContainers) | nindent 2 }}
+  command: ['sh', '-c', "mkdir -p /tmp/plugins-ext && cd /tmp/plugins-ext && ( rm {{regexFind "[^/]+$" $url}} || true ) && wget {{ $url }}"]
+  volumeMounts:
+    - name: graviteeio-apim-{{ $key }}-ext
+      mountPath: /tmp/plugins-ext
+{{- end }}
+{{- end -}}
+
+{{/*
+Create volumeMounts for plugins
+*/}}
+{{- define "deployment.pluginVolumeMounts" -}}
+{{- if or .plugins .extPlugins }}
+- name: graviteeio-apim-plugins
+  mountPath: /opt/{{ .appName }}/plugins-ext
+{{- end }}
+{{- $appName := .appName -}}
+{{- range $key, $_ := .extPlugins }}
+- name: graviteeio-apim-{{ $key }}-ext
+  mountPath: /opt/{{ $appName }}/plugins-ext/ext/{{ $key }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Create volumes for plugins
+*/}}
+{{- define "deployment.pluginVolumes" -}}
+{{- if or .plugins .extPlugins }}
+- name: graviteeio-apim-plugins
+  emptyDir: {}
+{{- end }}
+{{- range $key, $_ := .extPlugins }}
+- name: graviteeio-apim-{{ $key }}-ext
+  emptyDir: {}
+{{- end }}
+{{- end -}}
+
+{{/*
+Classify the configured JDBC URL family.
+*/}}
+{{- define "apim.jdbcDriverFamily" -}}
+{{- $url := lower (default "" .Values.jdbc.url) -}}
+{{- if hasPrefix "jdbc:postgresql:" $url -}}
+postgresql
+{{- else if hasPrefix "jdbc:mariadb:" $url -}}
+mariadb
+{{- else if hasPrefix "jdbc:sqlserver:" $url -}}
+sqlserver
+{{- else if hasPrefix "jdbc:mysql:" $url -}}
+mysql
+{{- else -}}
+other
+{{- end -}}
+{{- end -}}
+
+{{/*
+Configured JDBC driver source.
+*/}}
+{{- define "apim.jdbcDriverSource" -}}
+{{- $source := lower (default "auto" .Values.jdbc.driverSource) -}}
+{{- if has $source (list "auto" "download" "image" "preinstalled") -}}
+{{- $source -}}
+{{- else -}}
+{{- fail (printf "jdbc.driverSource must be one of auto, download, image, preinstalled, got %q" .Values.jdbc.driverSource) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Whether the JDBC driver should be downloaded at startup.
+*/}}
+{{- define "apim.shouldDownloadJdbcDriver" -}}
+{{- $family := include "apim.jdbcDriverFamily" . -}}
+{{- $source := include "apim.jdbcDriverSource" . -}}
+{{- if eq .Values.management.type "jdbc" -}}
+{{- if and (eq $source "download") .Values.jdbc.driver -}}
+true
+{{- else if and (eq $source "auto") .Values.jdbc.driver (not (or (eq $family "postgresql") (eq $family "mariadb") (eq $family "sqlserver"))) -}}
+true
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Whether the JDBC driver should be copied from a dedicated image.
+*/}}
+{{- define "apim.shouldCopyJdbcDriverFromImage" -}}
+{{- $source := include "apim.jdbcDriverSource" . -}}
+{{- if and (eq .Values.management.type "jdbc") (eq $source "image") -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
+Whether the JDBC volume and mount should be provisioned.
+*/}}
+{{- define "apim.shouldProvisionJdbcDriver" -}}
+{{- if or (eq (include "apim.shouldDownloadJdbcDriver" .) "true") (eq (include "apim.shouldCopyJdbcDriverFromImage" .) "true") -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
+Use the fullname if the serviceAccount value is not set
+*/}}
+{{- define "apim.serviceAccount" -}}
+{{- if or (not .Values.apim.managedServiceAccount) (and .Values.apim.managedServiceAccount .Values.apim.serviceAccount) }}
+{{- .Values.apim.serviceAccount -}}
+{{- else }}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the target Kubernetes version
+*/}}
+{{- define "common.capabilities.kubeVersion" -}}
+{{- if .Values.global }}
+    {{- if .Values.global.kubeVersion }}
+    {{- .Values.global.kubeVersion -}}
+    {{- else }}
+    {{- default .Capabilities.KubeVersion.Version .Values.kubeVersion -}}
+    {{- end -}}
+{{- else }}
+{{- default .Capabilities.KubeVersion.Version .Values.kubeVersion -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the appropriate apiVersion for poddisruptionbudget.
+*/}}
+{{- define "common.capabilities.policy.apiVersion" -}}
+{{- if semverCompare "<1.21-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "policy/v1beta1" -}}
+{{- else -}}
+{{- print "policy/v1" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the appropriate apiVersion for ingress.
+*/}}
+{{- define "common.capabilities.ingress.apiVersion" -}}
+{{- if semverCompare "<1.14-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "extensions/v1beta1" -}}
+{{- else if semverCompare "<1.19-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "networking.k8s.io/v1beta1" -}}
+{{- else -}}
+{{- print "networking.k8s.io/v1" -}}
+{{- end }}
+{{- end -}}
+
+{{/*
+Returns true if the ingressClassname field is supported
+Usage:
+{{ include "common.ingress.supportsIngressClassname" . }}
+*/}}
+{{- define "common.ingress.supportsIngressClassname" -}}
+{{- if semverCompare "<1.18-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "false" -}}
+{{- else -}}
+{{- print "true" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Renders the annotations for an ingress
+Usage:
+{{ include "common.ingress.annotations.render" ( dict "annotations" .Values.path.to.the.Value "ingressClassName" .Values.path.to.the.Value "context" $) }}
+*/}}
+{{- define "common.ingress.annotations.render" -}}
+{{- $ingressType := get $.annotations "kubernetes.io/ingress.class"  }}
+{{- range $key, $value := $.annotations }}
+{{- if or ( ne $key "kubernetes.io/ingress.class" ) ( not ( and ( $.ingressClassName ) ( include "common.ingress.supportsIngressClassname" $.context ))) }}
+{{- if or (not (hasPrefix "nginx.ingress.kubernetes.io" $key)) (and (hasPrefix "nginx.ingress.kubernetes.io" $key) (contains "nginx" $ingressType)) }}
+{{ $key }}: {{ $value | quote }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Returns true if the appProtocol field is supported
+Usage:
+{{ include "common.service.supportsAppProtocol" . }}
+*/}}
+{{- define "common.service.supportsAppProtocol" -}}
+{{- if semverCompare "<1.18-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "false" -}}
+{{- else -}}
+{{- print "true" -}}
+{{- end -}}
+{{- end -}}
+
+Return the appropriate apiVersion for pod autoscaling.
+*/}}
+{{- define "common.capabilities.autoscaling.apiVersion" -}}
+{{- if semverCompare "<1.12-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "autoscaling/v2beta1" -}}
+{{- else if semverCompare "<1.23-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "autoscaling/v2beta2" -}}
+{{- else -}}
+{{- print "autoscaling/v2" -}}
+{{- end }}
+{{- end -}}
+
+{{/*
+Gateway API Docker images tag.
+*/}}
+{{- define "gateway.dockerTag" -}}
+{{- if .Values.gateway.image.tag -}}
+{{- .Values.gateway.image.tag -}}
+{{- else -}}
+{{- printf "%s-debian" .Chart.AppVersion -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Returns true if an extraVolumes named config is defined
+Usage:
+{{ include "gateway.externalConfig" . }}
+*/}}
+{{- define "gateway.externalConfig" -}}
+{{- if hasKey .Values.gateway "extraVolumes" }}
+{{- if contains "- name: config" .Values.gateway.extraVolumes  }}
+{{- print "true" -}}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Returns logback if an extraVolumes named config is defined and gateway.logging.debug is set to true, else return config
+Usage:
+{{ include "gateway.logbackVolumeName" . }}
+*/}}
+{{- define "gateway.logbackVolumeName" -}}
+{{- if and (include "gateway.externalConfig" .) (or .Values.gateway.logging.debug .Values.gateway.logback.override) }}
+{{- print "logback" -}}
+{{- else -}}
+{{- print "config" -}}
+{{- end }}
+{{- end }}
+
+{{/*
+API processing timeout read by gateway from http.requestTimeout.
+When gateway.servers is used, derive from the first HTTP server entry, else gateway.http.
+*/}}
+{{- define "gateway.httpRequestTimeout" -}}
+{{- $result := .Values.gateway.http.requestTimeout -}}
+{{- $found := false -}}
+{{- range .Values.gateway.servers -}}
+{{- if and (not $found) (eq .type "http") (hasKey . "requestTimeout") -}}
+{{- $result = .requestTimeout -}}
+{{- $found = true -}}
+{{- end -}}
+{{- end -}}
+{{- printf "%v" (int $result) -}}
+{{- end -}}
+
+{{/*
+API processing timeout grace delay read by gateway from http.requestTimeoutGraceDelay.
+When gateway.servers is used, derive from the first HTTP server entry, else gateway.http.
+*/}}
+{{- define "gateway.httpRequestTimeoutGraceDelay" -}}
+{{- $result := .Values.gateway.http.requestTimeoutGraceDelay -}}
+{{- $found := false -}}
+{{- range .Values.gateway.servers -}}
+{{- if and (not $found) (eq .type "http") (hasKey . "requestTimeoutGraceDelay") -}}
+{{- $result = .requestTimeoutGraceDelay -}}
+{{- $found = true -}}
+{{- end -}}
+{{- end -}}
+{{- printf "%v" (int $result) -}}
+{{- end -}}
+
+{{/*
+Management API Docker images tag.
+*/}}
+{{- define "api.dockerTag" -}}
+{{- if .Values.api.image.tag -}}
+{{- .Values.api.image.tag -}}
+{{- else -}}
+{{- printf "%s-debian" .Chart.AppVersion -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Returns true if an extraVolumes named config is defined
+Usage:
+{{ include "api.externalConfig" . }}
+*/}}
+{{- define "api.externalConfig" -}}
+{{- if hasKey .Values.api "extraVolumes" }}
+{{- if contains "- name: config" .Values.api.extraVolumes  }}
+{{- print "true" -}}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Returns logback if an extraVolumes named config is defined and api.logging.debug is set to true, else return config
+Usage:
+{{ include "api.logbackVolumeName" . }}
+*/}}
+{{- define "api.logbackVolumeName" -}}
+{{- if and (include "api.externalConfig" .) (or .Values.api.logging.debug .Values.api.logback.override) }}
+{{- print "logback" -}}
+{{- else -}}
+{{- print "config" -}}
+{{- end }}
+{{- end }}
+
+{{/*
+Returns true if an extraVolumes named config is defined
+Usage:
+{{ include "portal.externalConfig" . }}
+*/}}
+{{- define "portal.externalConfig" -}}
+{{- if hasKey .Values.portal "extraVolumes" }}
+{{- if contains "- name: config" .Values.portal.extraVolumes  }}
+{{- print "true" -}}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Returns true if an extraVolumes named config is defined
+Usage:
+{{ include "ui.externalConfig" . }}
+*/}}
+{{- define "ui.externalConfig" -}}
+{{- if hasKey .Values.ui "extraVolumes" }}
+{{- if contains "- name: config" .Values.ui.extraVolumes  }}
+{{- print "true" -}}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- define "ui.base_href.defined" -}}
+{{- if contains "CONSOLE_BASE_HREF" (.Values.ui.env | toString) -}}
+{{- print "true" -}}
+{{ else }}
+{{- print "false" -}}
+{{- end }}
+{{- end }}
+
+{{/*
+Returns true if an extraVolumes named config is defined
+Usage:
+{{ include "gamma.externalConfig" . }}
+*/}}
+{{- define "gammaUi.externalConfig" -}}
+{{- if hasKey .Values.gammaUi "extraVolumes" }}
+{{- if contains "- name: config" .Values.gammaUi.extraVolumes  }}
+{{- print "true" -}}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- define "gammaUi.base_href.defined" -}}
+{{- if contains "GAMMA_BASE_HREF" (.Values.gammaUi.env | toString) -}}
+{{- print "true" -}}
+{{ else }}
+{{- print "false" -}}
+{{- end }}
+{{- end }}
+
+{{- define "portal.base_href.defined" -}}
+{{- if contains "PORTAL_BASE_HREF" (.Values.portal.env | toString) -}}
+{{- print "true" -}}
+{{ else }}
+{{- print "false" -}}
+{{- end }}
+{{- end }}
+
+{{/*
+Returns installation type from the values or use default value
+Usage:
+{{ include "installation.type" . }}
+*/}}
+{{- define "installation.type" -}}
+{{- if hasKey .Values "installation" }}
+{{- print .Values.installation.type | default "standalone" -}}
+{{ else}}
+{{- print "standalone" -}}
+{{- end }}
+{{- end }}

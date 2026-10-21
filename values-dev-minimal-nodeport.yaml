@@ -1,0 +1,186 @@
+# Gravitee APIM - minimal dev install for small Kubernetes nodes.
+# For the official `apim` Helm chart in the gravitee-api-management repo (helm/, chart v4.13.0).
+#
+# What runs after install (all replica 1, ~1.5GiB of requests total):
+#   graviteeio-apim-mongodb-replicaset-0   MongoDB (single-node replica set, local-path)
+#   graviteeio-apim-elasticsearch-\*       Elasticsearch: 1 master + 1 data(+ingest) node (local-path)
+#   graviteeio-apim-management-api-\*      Management API   -> NodePort 30083 (http)
+#   graviteeio-apim-gateway-\*             API Gateway      -> NodePort 30082 (http)
+#   graviteeio-apim-management-ui-\*       Console UI       -> NodePort 30081 (http)
+#
+# Excluded: developer portal UI, Alert Engine, Gamma, Cockpit, Kafka console,
+#           autoscaling, all Ingress objects (NodePort only).
+#
+# Default admin login is admin / admin and the default JWT secret ships with the
+# chart -- acceptable for a dev cluster, change both for anything else.
+#
+# ============================================================================
+# EDIT the `ui` section below: the console's Management API URL (CHANGE_ME_NODE_IP).
+# ============================================================================
+management:
+  type: mongodb
+ratelimit:
+  type: mongodb
+
+# The APIM chart pins frozen Bitnami legacy images (bitnamilegacy/*) for its
+# MongoDB and Elasticsearch subcharts; without this flag the Bitnami image
+# verification in the subcharts' NOTES fails the whole install.
+global:
+  security:
+    allowInsecureImages: true
+
+# No SMTP in dev: notifications fail silently instead of trying to connect
+smtp:
+  enabled: false
+notifiers:
+  smtp:
+    enabled: false
+
+# Tech-preview / enterprise extras - none in a minimal install
+portal:
+  enabled: false
+cockpit:
+  enabled: false
+kafkaConsole:
+  enabled: false
+gamma:
+  enabled: false
+
+api:
+  enabled: true
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  ingress:
+    management:
+      enabled: false
+    portal:
+      enabled: false
+  service:
+    type: NodePort
+    externalPort: 83
+    nodePort: 30083
+
+gateway:
+  enabled: true
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: false
+  service:
+    type: NodePort
+    externalPort: 82
+    nodePort: 30082
+
+ui:
+  enabled: true
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  ingress:
+    enabled: false
+  service:
+    type: NodePort
+    externalPort: 8002
+    nodePort: 30081
+
+  # ==========================================================================
+  # EDIT THIS ONE BLOCK: the console is a static UI rendered in your BROWSER,
+  # so it must be pointed at a node-reachable address of the Management API.
+  # Replace CHANGE_ME_NODE_IP with any worker/control-plane node IP
+  # (kubectl get nodes -o wide). Without this the login page cannot reach the API.
+  # ==========================================================================
+  # Written into the console's constants.json
+  baseURL: http://CHANGE_ME_NODE_IP:30083/management
+  # Overrides the env the chart renders (it falls back to apim.example.com when no ingress is used)
+  env:
+    - name: MGMT_API_URL
+      value: http://CHANGE_ME_NODE_IP:30083/management/
+
+# --- MongoDB subchart (bitnami/mongodb 16.5.45) -----------------------------
+mongodb:
+  enabled: true
+  # Chart default is architecture: replicaset (matches mongo.dbhost default: ...-headless)
+  replicaCount: 1
+  # A single-node replica set needs no arbiter for quorum
+  arbiter:
+    enabled: false
+  pdb:
+    create: false
+  networkPolicy:
+    enabled: false
+  extraFlags:
+    # Keep mongod's cache inside the 512Mi limit
+    - "--wiredTigerCacheSizeGB=0.25"
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  persistence:
+    enabled: true
+    storageClass: local-path
+    size: 1Gi
+
+# --- Elasticsearch subchart (bitnami/elasticsearch 22.0.13) ------------------
+# Keep 1 master + 1 data node; the data node also takes the ingest role because
+# APIM's analytics pipeline (geoip/user_agent) needs an ingest-capable node.
+es:
+  enabled: true
+  settings:
+    # Single data node: no replica shards
+    number_of_replicas: 0
+  endpoints:
+    - http://graviteeio-apim-elasticsearch-data-hl:9200
+
+elasticsearch:
+  enabled: true
+  # bitnami/os-shell tags left the main Bitnami catalog; legacy still publishes them
+  sysctlImage:
+    repository: bitnamilegacy/os-shell
+  master:
+    replicaCount: 1
+    heapSize: 128m
+    pdb:
+      create: false
+    networkPolicy:
+      enabled: false
+    resources:
+      limits:
+        cpu: 500m
+        memory: 768Mi
+      requests:
+        cpu: 25m
+        memory: 256Mi
+    persistence:
+      enabled: true
+      storageClass: local-path
+      size: 2Gi
+  data:
+    replicaCount: 1
+    extraRoles:
+      - ingest
+    heapSize: 512m
+    pdb:
+      create: false
+    networkPolicy:
+      enabled: false
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1024Mi
+      requests:
+        cpu: 50m
+        memory: 256Mi
+    persistence:
+      enabled: true
+      storageClass: local-path
+      size: 3Gi
+  coordinating:
+    replicaCount: 0
+  ingest:
+    enabled: false
+    replicaCount: 0

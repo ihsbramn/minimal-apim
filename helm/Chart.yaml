@@ -1,0 +1,50 @@
+apiVersion: v1
+name: apim
+# Also update CHANGELOG.md
+version: 4.13.0
+appVersion: 4.13.0
+description: Official Gravitee.io Helm chart for API Management
+home: https://gravitee.io
+sources:
+  - https://github.com/gravitee-io
+icon: https://avatars2.githubusercontent.com/u/12655666?s=200&v=4
+keywords:
+  - gravitee.io
+  - gravitee
+  - graviteeio
+  - API
+  - API Management
+kubeVersion: ">=1.14.0-0"
+annotations:
+  # List of changes for the release in artifacthub.io
+  # https://artifacthub.io/packages/helm/graviteeio/apim?modal=changelog
+  # example:
+  #     - kind: added
+  #      description: 'Allow to customize Kafka Gateway bootstrap and brokers domain patterns'
+  #      links:
+  #        - name: Github Issue
+  #          url: https://github.com/gravitee-io/issues/issues/xxx
+  ###########
+  # WARNING #
+  ###########
+  # "changes" must be the last section in this file, because a CI job clean it after each release
+  ###########
+  artifacthub.io/changes: |
+    - kind: added
+      description: "Support multiple custom domains for native Kafka APIs with `gateway.kafka.routingHostMode.domains` (list)"
+      links:
+        - name: Github PR
+          url: https://github.com/gravitee-io/gravitee-api-management/pull/17691
+    - kind: deprecated
+      description: "`gateway.kafka.routingHostMode.defaultDomain` is deprecated in favor of `domains` and ignored when `domains` is set"
+    - kind: changed
+      description: "`gateway.kafka.routingHostMode` pattern examples now use the `{domain}` placeholder, substituted with each configured domain in turn; hardcoding a domain there collapses every entry onto the same hostname (`{defaultDomain}` remains a supported alias)"
+    - kind: added
+      description: "Document `gateway.services.metrics.kafka.durations.principalName` to add the principal_name tag to Kafka duration metrics (disabled by default)"
+    - kind: added
+      description: 'Render config/hazelcast.xml for gateway Hazelcast clustering (gateway.cluster.type=hazelcast) with Kubernetes discovery. Cluster name defaults to release-sharding_tags for Redis distributed-event isolation; require gateway.cluster when gateway.distributedSync is enabled'
+    - kind: fixed
+      description: 'Allow Hazelcast cluster and Redis distributed sync'
+      links:
+        - name: Github Issue
+          url: https://github.com/gravitee-io/issues/issues/11583

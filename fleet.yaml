@@ -1,0 +1,9 @@
+# Rancher Fleet bundle: deploys the vendored `apim` Helm chart with the minimal dev values.
+# Hook this directory into Fleet (e.g. Continuous Deployment -> Git Repos -> cluster group of
+# your dev cluster) and Fleet picks up this fleet.yaml automatically.
+namespace: apim-dev
+helm:
+  chart: ./helm
+  releaseName: apim
+  valuesFiles:
+    - values-dev-minimal-nodeport.yaml
