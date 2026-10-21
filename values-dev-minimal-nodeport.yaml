@@ -98,13 +98,14 @@ ui:
   # so it must be pointed at a node-reachable address of the Management API.
   # Replace CHANGE_ME_NODE_IP with any worker/control-plane node IP
   # (kubectl get nodes -o wide). Without this the login page cannot reach the API.
+  # Do NOT override MGMT_API_URL via ui.env as well: the chart renders the same
+  # env var itself and Kubernetes server-side apply (Fleet) rejects duplicates.
+  # The mounted constants.json below overrides the URL the env var would set.
   # ==========================================================================
-  # Written into the console's constants.json
+  # Written into the console's constants.json (verified: the image serves this
+  # file verbatim; it only env-substitutes $VAR placeholders inside the file)
   baseURL: http://CHANGE_ME_NODE_IP:30083/management
-  # Overrides the env the chart renders (it falls back to apim.example.com when no ingress is used)
-  env:
-    - name: MGMT_API_URL
-      value: http://CHANGE_ME_NODE_IP:30083/management/
+  env: []
 
 # --- MongoDB subchart (bitnami/mongodb 16.5.45) -----------------------------
 mongodb:
