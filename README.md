@@ -62,5 +62,12 @@ with `values-dev-minimal-nodeport.yaml` into namespace `apim-dev`.
   image verification otherwise rejects.
 - Dev-only defaults to change for anything beyond dev: the default `admin / admin`
   in-memory admin, the chart's default JWT secret, and no auth on MongoDB/Elasticsearch.
+- Image versions: the APIM chart at 4.13.0 (from the gravitee-api-management repo) is
+  ahead of published images — only `4.13.0-alpha.*` exists, so the values pin the latest
+  GA images: `graviteeio/apim-{management-api,gateway}:4.12.23-debian`,
+  `graviteeio/apim-management-ui:4.12.23`, and Bitnami legacy build tags
+  (`bitnamilegacy/mongodb:6.0.13-debian-11-r21` — the plain `6.0.13` tag does not exist
+  in the legacy catalog). Once 4.13.0 GA images publish, the `image.tag` overrides can
+  be dropped and the chart version bumped.
 - To add the developer portal back, set `portal.enabled: true` (and expose it on a
   NodePort the same way).

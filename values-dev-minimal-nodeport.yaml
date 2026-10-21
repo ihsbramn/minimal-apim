@@ -51,6 +51,9 @@ api:
   replicaCount: 1
   autoscaling:
     enabled: false
+  image:
+    # 4.13.0 GA images are not published yet (only 4.13.0-alpha.*); pin the latest GA
+    tag: 4.12.23-debian
   ingress:
     management:
       enabled: false
@@ -66,6 +69,8 @@ gateway:
   replicaCount: 1
   autoscaling:
     enabled: false
+  image:
+    tag: 4.12.23-debian
   ingress:
     enabled: false
   service:
@@ -78,6 +83,9 @@ ui:
   replicaCount: 1
   autoscaling:
     enabled: false
+  image:
+    # UI images publish without the -debian suffix
+    tag: 4.12.23
   ingress:
     enabled: false
   service:
@@ -103,6 +111,10 @@ mongodb:
   enabled: true
   # Chart default is architecture: replicaset (matches mongo.dbhost default: ...-headless)
   replicaCount: 1
+  image:
+    # bitnamilegacy publishes only -r build-suffixed tags for 6.0.13 (plain 6.0.13 does not exist)
+    repository: bitnamilegacy/mongodb
+    tag: 6.0.13-debian-11-r21
   # A single-node replica set needs no arbiter for quorum
   arbiter:
     enabled: false
