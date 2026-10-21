@@ -60,6 +60,12 @@ with `values-dev-minimal-nodeport.yaml` into namespace `apim-dev`.
 - `global.security.allowInsecureImages: true` is required because the chart pins frozen
   Bitnami `bitnamilegacy/*` images (post-catalog-migration), which the Bitnami subcharts'
   image verification otherwise rejects.
+- `bitnamilegacy` images run as **uid 1001 / gid 0**: the legacy builds ship their internal
+  default configs as `0640 root:root` and copy them at boot under `set -o errexit`, which
+  crash-loops a plain uid-1001 container (verified in the image). gid 0 makes the files
+  group-readable; MongoDB additionally gets a chart-native `volumePermissions` init and
+  Elasticsearch an injected chown init, because hostPath-backed PVCs (`local-path`) do not
+  receive the pod `fsGroup`.
 - Dev-only defaults to change for anything beyond dev: the default `admin / admin`
   in-memory admin, the chart's default JWT secret, and no auth on MongoDB/Elasticsearch.
 - Image versions: the APIM chart at 4.13.0 (from the gravitee-api-management repo) is

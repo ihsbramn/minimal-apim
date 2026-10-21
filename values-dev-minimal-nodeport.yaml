@@ -116,6 +116,21 @@ mongodb:
     # bitnamilegacy publishes only -r build-suffixed tags for 6.0.13 (plain 6.0.13 does not exist)
     repository: bitnamilegacy/mongodb
     tag: 6.0.13-debian-11-r21
+  # Bitnami legacy images ship internal default configs as 0640 root:root and the image
+  # entrypoint copies them at boot under `set -o errexit`, killing the container when it
+  # runs as plain uid 1001 (verified locally). Run as uid 1001 but gid 0: the files are
+  # group-readable, while the pod's fsGroup: 1001 keeps the data dir writable.
+  containerSecurityContext:
+    runAsGroup: 0
+  # local-path (hostPath-backed) PVCs do not get the pod fsGroup applied; chown the
+  # volume at pod start instead
+  volumePermissions:
+    enabled: true
+    image:
+      repository: bitnamilegacy/os-shell
+      tag: 12-debian-12-r48
+    securityContext:
+      runAsUser: 0
   # A single-node replica set needs no arbiter for quorum
   arbiter:
     enabled: false
@@ -154,9 +169,13 @@ elasticsearch:
   # bitnami/os-shell tags left the main Bitnami catalog; legacy still publishes them
   sysctlImage:
     repository: bitnamilegacy/os-shell
+  # Same legacy-image group-permission issue as MongoDB: run containers as uid 1001
+  # but gid 0 so the 0640 root-group-owned default configs are readable at boot.
   master:
     replicaCount: 1
     heapSize: 128m
+    containerSecurityContext:
+      runAsGroup: 0
     pdb:
       create: false
     networkPolicy:
@@ -177,6 +196,8 @@ elasticsearch:
     extraRoles:
       - ingest
     heapSize: 512m
+    containerSecurityContext:
+      runAsGroup: 0
     pdb:
       create: false
     networkPolicy:
@@ -197,3 +218,18 @@ elasticsearch:
   ingest:
     enabled: false
     replicaCount: 0
+  # local-path (hostPath-backed) PVCs do not get the pod fsGroup applied; chown the
+  # data dir at pod start (both master and data sts mount their PVC at
+  # /bitnami/elasticsearch/data, so one top-level init container covers both)
+  initContainers:
+    - name: volume-permissions
+      image: docker.io/bitnamilegacy/os-shell:12-debian-12-r48
+      securityContext:
+        runAsUser: 0
+        allowPrivilegeEscalation: false
+        capabilities:
+          add: ["CHOWN"]
+      command: ["/bin/sh", "-ec", "chown 1001:1001 /bitnami/elasticsearch/data"]
+      volumeMounts:
+        - name: data
+          mountPath: /bitnami/elasticsearch/data
