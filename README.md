@@ -20,18 +20,27 @@ sized for small clusters (e.g. 12 cores / 7 GiB) that already run other workload
 
 ## Node URLs and DNS
 
-The console is a static UI rendered in your **browser**, and the Management API validates
-its own public URLs with Guava `InternetDomainName`, which **rejects bare IPs
-** (the API crashes with `InvalidInstallationUrlException` otherwise). This repo therefore
-pins the URLs to a wildcard-DNS hostname that resolves to the dev node, `192.168.1.252`
-(verified with public DNS):
+The console and the Management API are served from **one origin**: the console pod's
+nginx proxies `/management/` and `/portal/` to the `apim-api` service (see the
+`extraObjects` nginx config in `values-dev-minimal-nodeport.yaml`). This keeps the
+browser's authentication cookies **first-party** — serving the API on its own
+`30083` port makes it a third party to the console origin, and Brave Shields,
+incognito and modern browsers block those cookies, leaving `/user` at 401 after
+every login. The proxy target is the in-namespace service name of the Management
+API and must match the Helm release name.
 
-- `http://192.168.1.252.nip.io:30083` — Management API (`installation.api.url`)
-- `http://192.168.1.252.nip.io:30081/` — Console (`installation.standalone.console.urls`)
+The hosts are `192.168.1.252.nip.io` (wildcard DNS resolving to the dev node,
+verified with public DNS) because the Management API validates
+`installation.api.url` and the standalone console URLs with Guava
+`InternetDomainName`, which **rejects bare IPs** (the API crashes with
+`InvalidInstallationUrlException`). If the node IP changes, replace
+`192.168.1.252` everywhere in `values-dev-minimal-nodeport.yaml`. Machines with
+no internet DNS can add the name to `/etc/hosts` and use a domain they control.
 
-If the node IP changes, replace `192.168.1.252` everywhere in
-`values-dev-minimal-nodeport.yaml`. Machines with no internet DNS can instead add the
-name to `/etc/hosts` (`192.168.1.252 apim.dev.nip.io`) and use a domain you control.
+| Endpoint | URL |
+| --- | --- |
+| Console + API (same origin) | `http://192.168.1.252.nip.io:30081` |
+| API Gateway (consumers) | `http://192.168.1.252.nip.io:30082` |
 
 ## Install (helm CLI)
 
