@@ -4,113 +4,28 @@
 # What runs after install (all replica 1, ~1.5GiB of requests total):
 #   graviteeio-apim-mongodb-replicaset-0   MongoDB (single-node replica set, local-path)
 #   graviteeio-apim-elasticsearch-\*       Elasticsearch: 1 master + 1 data(+ingest) node (local-path)
-#   graviteeio-apim-management-api-\*      Management API   -> NodePort 30083 (http)
-#   graviteeio-apim-gateway-\*             API Gateway      -> NodePort 30082 (http)
-#   graviteeio-apim-management-ui-\*       Console UI       -> NodePort 30081 (http)
+#   graviteeio-apim-management-api-\*      Management API   <- Ingress /management (+ /portal)
+#   graviteeio-apim-gateway-\*             API Gateway      -> NodePort 30082 (consumers)
+#   graviteeio-apim-management-ui-\*       Console UI       <- Ingress /
+#
+# Everything browser-facing is served by the cluster ingress (Traefik on 80/443 in this
+# cluster) under ONE host: http://192.168.1.252.apim.sslip.io - one origin keeps the
+# browser's authentication cookies first-party (third-party cookies are blocked by
+# Brave Shields, incognito and modern browsers). sslip.io wildcard DNS resolves the
+# name to the node IP; the API requires name-shaped URLs (bare IPs are rejected).
+# In a browser without public DNS, add: 192.168.1.252 apim.internal -> and switch the
+# ingress hosts + the gateway NodePort accordingly.
 #
 # Excluded: developer portal UI, Alert Engine, Gamma, Cockpit, Kafka console,
-#           autoscaling, all Ingress objects (NodePort only).
+#           autoscaling, all Ingress TLS (dev only).
 #
 # Default admin login is admin / admin and the default JWT secret ships with the
 # chart -- acceptable for a dev cluster, change both for anything else.
 
-# The console nginx in the UI pod proxies the Management API on the SAME origin
-# (:30081), so browser authentication cookies stay first-party. Cross-origin calls
-# from :30081 to a :30083 API would be blocked as third-party cookies by Brave
-# Shields, incognito and modern browsers, leaving /user at 401 after every login.
-# NOTE: the proxy target is the in-namespace service name of the Management API -
-# it must match the helm release name (`apim` here). Change it if you re-install
-# under a different release name.
-extraObjects:
-  - apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: apim-dev-ui-nginx-conf
-    data:
-      default.conf: |
-        server {
-            listen [::]:$HTTP_PORT ipv6only=off;
-            listen [::]:$HTTPS_PORT ipv6only=off;
-            server_name $SERVER_NAME;
-            large_client_header_buffers 4 64k;
-
-            add_header X-Frame-Options "SAMEORIGIN" always;
-            add_header Content-Security-Policy "default-src 'none'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; object-src 'none'; frame-ancestors 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; connect-src http: https:; base-uri 'self'; form-action 'self'; font-src 'self';" always;
-            add_header X-XSS-Protection "1; mode=block";
-            add_header X-Content-Type-Options nosniff;
-            add_header X-Permitted-Cross-Domain-Policies none;
-
-            index index.html index.htm;
-            charset utf-8;
-            client_max_body_size 64m;
-
-            gzip on;
-            gzip_disable "msie6";
-
-            gzip_vary on;
-            gzip_proxied any;
-            gzip_comp_level 6;
-            gzip_buffers 16 8k;
-            gzip_http_version 1.1;
-            gzip_types text/plain text/css application/json application/x-javascript text/xml application/xml application/xml+rss text/javascript application/javascript;
-
-            location /management/ {
-                proxy_pass http://apim-api:8083/management/;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Host $host;
-                proxy_set_header X-Forwarded-Proto $scheme;
-                proxy_read_timeout 600s;
-            }
-
-            location /portal/ {
-                proxy_pass http://apim-api:8083/portal/;
-                proxy_set_header Host $host;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header X-Forwarded-Host $host;
-                proxy_set_header X-Forwarded-Proto $scheme;
-                proxy_read_timeout 600s;
-            }
-
-            location / {
-                try_files $uri $uri/ =404;
-                error_page 404 /;
-                root /rw.mount/www;
-                sub_filter '<base href="/"' '<base href="$CONSOLE_BASE_HREF"';
-                sub_filter_once on;
-            }
-
-            error_page   500 502 503 504  /50x.html;
-            location = /50x.html {
-                root   /rw.mount/www;
-            }
-        }
-#
-# ============================================================================
-# EDIT the `ui` section below: the console's Management API URL (192.168.1.252).
-# ============================================================================
 management:
   type: mongodb
 ratelimit:
   type: mongodb
-
-# The Management API hands its own public URLs to the console on /v2/ui/bootstrap.
-# These URLs are validated by the Management API with Guava InternetDomainName, which
-# rejects bare IPs (last all-numeric label) and crashes the API otherwise. The console
-# uses wildcards DNS (nip.io) as the hostname resolves to the node IP from any LAN
-# machine with public DNS. Replace with your own DNS name for the node if preferred.
-installation:
-  type: standalone
-  api:
-    # Same origin as the console (:30081) - the console's nginx proxies it to the API
-    url: http://192.168.1.252.nip.io:30081
-  standalone:
-    console:
-      urls:
-        - orgId: DEFAULT
-          url: http://192.168.1.252.nip.io:30081/
 
 # The APIM chart pins frozen Bitnami legacy images (bitnamilegacy/*) for its
 # MongoDB and Elasticsearch subcharts; without this flag the Bitnami image
@@ -146,13 +61,33 @@ api:
     tag: 4.12.23-debian
   ingress:
     management:
-      enabled: false
+      enabled: true
+      scheme: http
+      pathType: Prefix
+      path: /management
+      ingressClassName: traefik
+      hosts:
+        - 192.168.1.252.apim.sslip.io
+      annotations:
+        # null removes the chart-default annotations (helm deep-merge keeps {} maps)
+        kubernetes.io/ingress.class: null
+        nginx.ingress.kubernetes.io/rewrite-target: null
     portal:
-      enabled: false
+      enabled: true
+      scheme: http
+      pathType: Prefix
+      path: /portal
+      ingressClassName: traefik
+      hosts:
+        - 192.168.1.252.apim.sslip.io
+      annotations:
+        # null removes the chart-default annotations (helm deep-merge keeps {} maps)
+        kubernetes.io/ingress.class: null
+        nginx.ingress.kubernetes.io/rewrite-target: null
   service:
-    type: NodePort
+    type: ClusterIP
     externalPort: 83
-    nodePort: 30083
+    internalPort: 8083
 
 gateway:
   enabled: true
@@ -162,11 +97,16 @@ gateway:
   image:
     tag: 4.12.23-debian
   ingress:
+    # API consumers (curl/scripts) use the gateway directly on its NodePort; the
+    # console host is reserved for the UI and Management API
+    enabled: false
+  ingressController:
     enabled: false
   service:
     type: NodePort
     externalPort: 82
     nodePort: 30082
+    internalPort: 8082
 
 ui:
   enabled: true
@@ -177,33 +117,21 @@ ui:
     # UI images publish without the -debian suffix
     tag: 4.12.23
   ingress:
-    enabled: false
+    enabled: true
+    scheme: http
+    pathType: Prefix
+    path: /
+    ingressClassName: traefik
+    hosts:
+      - 192.168.1.252.apim.sslip.io
+    annotations:
+      # null removes the chart-default annotations (helm deep-merge keeps {} maps)
+      kubernetes.io/ingress.class: null
+      nginx.ingress.kubernetes.io/rewrite-target: null
   service:
-    type: NodePort
+    type: ClusterIP
     externalPort: 8002
-    nodePort: 30081
-
-  # ==========================================================================
-  # The Management API URL is served on THIS ORIGIN by the console's nginx
-  # (proxied to the apim-api service, see extraObjects), so the browser's
-  # authentication cookies are first-party. Cross-origin 30081 -> 30083 was
-  # blocked as third-party cookies (Brave Shields, incognito).
-  # Do NOT override MGMT_API_URL via ui.env as well: the chart renders the same
-  # env var itself and Kubernetes server-side apply (Fleet) rejects duplicates.
-  # ==========================================================================
-  # Written into the console's constants.json (the /v2/ui/bootstrap response
-  # overrides it, so it stays consistent with installation.api.url below)
-  baseURL: http://192.168.1.252.nip.io:30081/management
-  env: []
-  # Custom nginx conf for the console (proxies the Management API on the same origin)
-  extraVolumes: |
-    - name: ui-nginx-conf
-      configMap:
-        name: apim-dev-ui-nginx-conf
-  extraVolumeMounts: |
-    - name: ui-nginx-conf
-      mountPath: /etc/nginx/conf.d/default.conf
-      subPath: default.conf
+    internalPort: 8080
 
 # --- MongoDB subchart (bitnami/mongodb 16.5.45) -----------------------------
 mongodb:

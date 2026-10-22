@@ -20,27 +20,23 @@ sized for small clusters (e.g. 12 cores / 7 GiB) that already run other workload
 
 ## Node URLs and DNS
 
-The console and the Management API are served from **one origin**: the console pod's
-nginx proxies `/management/` and `/portal/` to the `apim-api` service (see the
-`extraObjects` nginx config in `values-dev-minimal-nodeport.yaml`). This keeps the
-browser's authentication cookies **first-party** — serving the API on its own
-`30083` port makes it a third party to the console origin, and Brave Shields,
-incognito and modern browsers block those cookies, leaving `/user` at 401 after
-every login. The proxy target is the in-namespace service name of the Management
-API and must match the Helm release name.
+Everything browser-facing is served through the **cluster ingress** (Traefik on 80/443)
+under one wildcard-DNS host that resolves to the dev node, so the browser's
+authentication cookies are **first-party** (cross-origin ports make them third-party,
+which Brave Shields, incognito and modern browsers block):
 
-The hosts are `192.168.1.252.nip.io` (wildcard DNS resolving to the dev node,
-verified with public DNS) because the Management API validates
-`installation.api.url` and the standalone console URLs with Guava
+| Endpoint | URL | Exposed by |
+| --- | --- | --- |
+| Console + Management API (one origin) | `http://192.168.1.252.apim.sslip.io` | Ingresses `/` (UI), `/management`, `/portal` (API) |
+| API Gateway (consumers) | `http://192.168.1.252:30082` | NodePort |
+
+The hostnames are `sslip.io` wildcards (resolve to the node IP) because the Management
+API validates `installation.api.url` and the standalone console URLs with Guava
 `InternetDomainName`, which **rejects bare IPs** (the API crashes with
-`InvalidInstallationUrlException`). If the node IP changes, replace
-`192.168.1.252` everywhere in `values-dev-minimal-nodeport.yaml`. Machines with
-no internet DNS can add the name to `/etc/hosts` and use a domain they control.
-
-| Endpoint | URL |
-| --- | --- |
-| Console + API (same origin) | `http://192.168.1.252.nip.io:30081` |
-| API Gateway (consumers) | `http://192.168.1.252.nip.io:30082` |
+`InvalidInstallationUrlException`). The chart computes every console/API URL from the
+ingress host (`installation.api.url`, `constants.json`, `MGMT_API_URL`) — no overrides
+needed. If the node IP changes, replace `192.168.1.252` in the ingress hosts; machines
+without public DNS can add the name to `/etc/hosts` and use their own domain.
 
 ## Install (helm CLI)
 
