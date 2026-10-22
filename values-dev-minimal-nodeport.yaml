@@ -13,6 +13,80 @@
 #
 # Default admin login is admin / admin and the default JWT secret ships with the
 # chart -- acceptable for a dev cluster, change both for anything else.
+
+# The console nginx in the UI pod proxies the Management API on the SAME origin
+# (:30081), so browser authentication cookies stay first-party. Cross-origin calls
+# from :30081 to a :30083 API would be blocked as third-party cookies by Brave
+# Shields, incognito and modern browsers, leaving /user at 401 after every login.
+# NOTE: the proxy target is the in-namespace service name of the Management API -
+# it must match the helm release name (`apim` here). Change it if you re-install
+# under a different release name.
+extraObjects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: apim-dev-ui-nginx-conf
+    data:
+      default.conf: |
+        server {
+            listen [::]:$HTTP_PORT ipv6only=off;
+            listen [::]:$HTTPS_PORT ipv6only=off;
+            server_name $SERVER_NAME;
+            large_client_header_buffers 4 64k;
+
+            add_header X-Frame-Options "SAMEORIGIN" always;
+            add_header Content-Security-Policy "default-src 'none'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; object-src 'none'; frame-ancestors 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; connect-src http: https:; base-uri 'self'; form-action 'self'; font-src 'self';" always;
+            add_header X-XSS-Protection "1; mode=block";
+            add_header X-Content-Type-Options nosniff;
+            add_header X-Permitted-Cross-Domain-Policies none;
+
+            index index.html index.htm;
+            charset utf-8;
+            client_max_body_size 64m;
+
+            gzip on;
+            gzip_disable "msie6";
+
+            gzip_vary on;
+            gzip_proxied any;
+            gzip_comp_level 6;
+            gzip_buffers 16 8k;
+            gzip_http_version 1.1;
+            gzip_types text/plain text/css application/json application/x-javascript text/xml application/xml application/xml+rss text/javascript application/javascript;
+
+            location /management/ {
+                proxy_pass http://apim-api:8083/management/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Host $host;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_read_timeout 600s;
+            }
+
+            location /portal/ {
+                proxy_pass http://apim-api:8083/portal/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Host $host;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_read_timeout 600s;
+            }
+
+            location / {
+                try_files $uri $uri/ =404;
+                error_page 404 /;
+                root /rw.mount/www;
+                sub_filter '<base href="/"' '<base href="$CONSOLE_BASE_HREF"';
+                sub_filter_once on;
+            }
+
+            error_page   500 502 503 504  /50x.html;
+            location = /50x.html {
+                root   /rw.mount/www;
+            }
+        }
 #
 # ============================================================================
 # EDIT the `ui` section below: the console's Management API URL (192.168.1.252).
@@ -30,7 +104,8 @@ ratelimit:
 installation:
   type: standalone
   api:
-    url: http://192.168.1.252.nip.io:30083
+    # Same origin as the console (:30081) - the console's nginx proxies it to the API
+    url: http://192.168.1.252.nip.io:30081
   standalone:
     console:
       urls:
@@ -109,18 +184,26 @@ ui:
     nodePort: 30081
 
   # ==========================================================================
-  # EDIT THIS ONE BLOCK: the console is a static UI rendered in your BROWSER,
-  # so it must be pointed at a node-reachable address of the Management API.
-  # Replace 192.168.1.252 with any worker/control-plane node IP
-  # (kubectl get nodes -o wide). Without this the login page cannot reach the API.
+  # The Management API URL is served on THIS ORIGIN by the console's nginx
+  # (proxied to the apim-api service, see extraObjects), so the browser's
+  # authentication cookies are first-party. Cross-origin 30081 -> 30083 was
+  # blocked as third-party cookies (Brave Shields, incognito).
   # Do NOT override MGMT_API_URL via ui.env as well: the chart renders the same
   # env var itself and Kubernetes server-side apply (Fleet) rejects duplicates.
-  # The mounted constants.json below overrides the URL the env var would set.
   # ==========================================================================
-  # Written into the console's constants.json (the /v2/ui/bootstrap response overrides
-  # it, so it stays consistent with the installation.api.url above)
-  baseURL: http://192.168.1.252.nip.io:30083/management
+  # Written into the console's constants.json (the /v2/ui/bootstrap response
+  # overrides it, so it stays consistent with installation.api.url below)
+  baseURL: http://192.168.1.252.nip.io:30081/management
   env: []
+  # Custom nginx conf for the console (proxies the Management API on the same origin)
+  extraVolumes: |
+    - name: ui-nginx-conf
+      configMap:
+        name: apim-dev-ui-nginx-conf
+  extraVolumeMounts: |
+    - name: ui-nginx-conf
+      mountPath: /etc/nginx/conf.d/default.conf
+      subPath: default.conf
 
 # --- MongoDB subchart (bitnami/mongodb 16.5.45) -----------------------------
 mongodb:
