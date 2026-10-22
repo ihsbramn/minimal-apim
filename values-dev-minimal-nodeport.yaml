@@ -42,14 +42,33 @@ notifiers:
     enabled: false
 
 # Tech-preview / enterprise extras - none in a minimal install
-portal:
-  enabled: false
 cockpit:
   enabled: false
 kafkaConsole:
   enabled: false
 gamma:
   enabled: false
+
+portal:
+  enabled: true
+  image:
+    # UI images publish without the -debian suffix (chart default 4.13.0 does not exist)
+    tag: 4.12.23
+  # The portal UI's REST base: SAME ORIGIN as the portal itself (below) so its
+  # cookies stay first-party too
+  baseURL: http://192.168.1.252.bntbs.openapi.sslip.io/portal
+  ingress:
+    enabled: true
+    scheme: http
+    pathType: Prefix
+    path: /
+    ingressClassName: traefik
+    hosts:
+      - 192.168.1.252.bntbs.openapi.sslip.io
+    annotations:
+      # null removes the chart-default annotations (helm deep-merge keeps {} maps)
+      kubernetes.io/ingress.class: null
+      nginx.ingress.kubernetes.io/rewrite-target: null
 
 api:
   enabled: true
@@ -78,7 +97,10 @@ api:
       pathType: Prefix
       path: /portal
       ingressClassName: traefik
+      # Served under BOTH hosts: the portal's own host (same-origin for the portal
+      # UI) and the console's host (same-origin for console-origin calls)
       hosts:
+        - 192.168.1.252.bntbs.openapi.sslip.io
         - 192.168.1.252.apim.sslip.io
       annotations:
         # null removes the chart-default annotations (helm deep-merge keeps {} maps)

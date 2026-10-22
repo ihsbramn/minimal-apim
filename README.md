@@ -28,6 +28,7 @@ which Brave Shields, incognito and modern browsers block):
 | Endpoint | URL | Exposed by |
 | --- | --- | --- |
 | Console + Management API (one origin) | `http://192.168.1.252.apim.sslip.io` | Ingresses `/` (UI), `/management`, `/portal` (API) |
+| Developer Portal | `http://192.168.1.252.bntbs.openapi.sslip.io` | Ingress `/` (portal UI), `/portal` for its REST, same-origin |
 | API Gateway (consumers) | `http://192.168.1.252:30082` | NodePort |
 
 The hostnames are `sslip.io` wildcards (resolve to the node IP) because the Management
