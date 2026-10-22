@@ -22,6 +22,19 @@ management:
 ratelimit:
   type: mongodb
 
+# The Management API hands its own public URLs to the console on /v2/ui/bootstrap;
+# with no ingress configured the chart defaults them to https://apim.example.com,
+# which the browser cannot reach. Pin the node URLs.
+installation:
+  type: standalone
+  api:
+    url: http://192.168.1.252:30083
+  standalone:
+    console:
+      urls:
+        - orgId: DEFAULT
+          url: http://192.168.1.252:30081/
+
 # The APIM chart pins frozen Bitnami legacy images (bitnamilegacy/*) for its
 # MongoDB and Elasticsearch subcharts; without this flag the Bitnami image
 # verification in the subcharts' NOTES fails the whole install.
