@@ -51,6 +51,8 @@ gamma:
 
 portal:
   enabled: true
+  autoscaling:
+    enabled: false
   image:
     # UI images publish without the -debian suffix (chart default 4.13.0 does not exist)
     tag: 4.12.23
@@ -119,9 +121,20 @@ gateway:
   image:
     tag: 4.12.23-debian
   ingress:
-    # API consumers (curl/scripts) use the gateway directly on its NodePort; the
-    # console host is reserved for the UI and Management API
-    enabled: false
+    # Consumers can use the ingress host below OR the NodePort 30082 (kept for
+    # curl/IP access). The console suggests this host as the default entrypoint
+    # for published APIs.
+    enabled: true
+    scheme: http
+    pathType: Prefix
+    path: /
+    ingressClassName: traefik
+    hosts:
+      - 192.168.1.252.bntbs.gateway.sslip.io
+    annotations:
+      # null removes the chart-default annotations (helm deep-merge keeps {} maps)
+      kubernetes.io/ingress.class: null
+      nginx.ingress.kubernetes.io/rewrite-target: null
   ingressController:
     enabled: false
   service:
