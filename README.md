@@ -18,21 +18,20 @@ Kafka console, autoscaling, and all Ingress objects — NodePort only.
 Resource footprint per install: **~1.5 GiB of requests** / ~3.3 GiB of limits —
 sized for small clusters (e.g. 12 cores / 7 GiB) that already run other workloads.
 
-## One edit before deploying
+## Node URLs and DNS
 
-The console is a static UI rendered in your **browser**, so it must be pointed at a
-node-reachable Management API URL. In `values-dev-minimal-nodeport.yaml`, in the `ui`
-section, replace `CHANGE_ME_NODE_IP` with any node IP (`kubectl get nodes -o wide`):
+The console is a static UI rendered in your **browser**, and the Management API validates
+its own public URLs with Guava `InternetDomainName`, which **rejects bare IPs
+** (the API crashes with `InvalidInstallationUrlException` otherwise). This repo therefore
+pins the URLs to a wildcard-DNS hostname that resolves to the dev node, `192.168.1.252`
+(verified with public DNS):
 
-```yaml
-ui:
-  baseURL: http://CHANGE_ME_NODE_IP:30083/management
-  env:
-    - name: MGMT_API_URL
-      value: http://CHANGE_ME_NODE_IP:30083/management/
-```
+- `http://192.168.1.252.nip.io:30083` — Management API (`installation.api.url`)
+- `http://192.168.1.252.nip.io:30081/` — Console (`installation.standalone.console.urls`)
 
-Both values must stay consistent; the trailing `/management` is required.
+If the node IP changes, replace `192.168.1.252` everywhere in
+`values-dev-minimal-nodeport.yaml`. Machines with no internet DNS can instead add the
+name to `/etc/hosts` (`192.168.1.252 apim.dev.nip.io`) and use a domain you control.
 
 ## Install (helm CLI)
 
