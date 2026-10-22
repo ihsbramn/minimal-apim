@@ -22,18 +22,20 @@ management:
 ratelimit:
   type: mongodb
 
-# The Management API hands its own public URLs to the console on /v2/ui/bootstrap;
-# with no ingress configured the chart defaults them to https://apim.example.com,
-# which the browser cannot reach. Pin the node URLs.
+# The Management API hands its own public URLs to the console on /v2/ui/bootstrap.
+# These URLs are validated by the Management API with Guava InternetDomainName, which
+# rejects bare IPs (last all-numeric label) and crashes the API otherwise. The console
+# uses wildcards DNS (nip.io) as the hostname resolves to the node IP from any LAN
+# machine with public DNS. Replace with your own DNS name for the node if preferred.
 installation:
   type: standalone
   api:
-    url: http://192.168.1.252:30083
+    url: http://192.168.1.252.nip.io:30083
   standalone:
     console:
       urls:
         - orgId: DEFAULT
-          url: http://192.168.1.252:30081/
+          url: http://192.168.1.252.nip.io:30081/
 
 # The APIM chart pins frozen Bitnami legacy images (bitnamilegacy/*) for its
 # MongoDB and Elasticsearch subcharts; without this flag the Bitnami image
@@ -115,9 +117,9 @@ ui:
   # env var itself and Kubernetes server-side apply (Fleet) rejects duplicates.
   # The mounted constants.json below overrides the URL the env var would set.
   # ==========================================================================
-  # Written into the console's constants.json (verified: the image serves this
-  # file verbatim; it only env-substitutes $VAR placeholders inside the file)
-  baseURL: http://192.168.1.252:30083/management
+  # Written into the console's constants.json (the /v2/ui/bootstrap response overrides
+  # it, so it stays consistent with the installation.api.url above)
+  baseURL: http://192.168.1.252.nip.io:30083/management
   env: []
 
 # --- MongoDB subchart (bitnami/mongodb 16.5.45) -----------------------------
